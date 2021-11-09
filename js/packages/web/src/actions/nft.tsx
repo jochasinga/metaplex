@@ -34,6 +34,82 @@ import BN from 'bn.js';
 const RESERVED_TXN_MANIFEST = 'manifest.json';
 const RESERVED_METADATA = 'metadata.json';
 
+const NFT_STORAGE_UPLOAD_ENDPOINT = 'https://api.nft.storage/upload';
+
+// Option of storage network. The idea is to pass this option to `mintNFT`
+// function and toggle between calling `uploadToArweave` and `uploadToNFTStorage`.
+enum Storage {
+  Arweave,
+  NFTStorage,
+}
+
+// Expected type from the upload. See https://nft.storage/api-docs/.
+interface INFTStorageResult {
+  value?: NFT;
+  error?: {
+    name: string;
+    message: string;
+  };
+}
+
+interface NFT {
+  cid: string;
+  size: number;
+  created: Date;
+  type: string;
+  scope: string;
+  pin: {
+    cid: string;
+    created: Date;
+    size: number;
+    status: string;
+    meta?: any;
+  };
+  files: Array<{
+    name: string;
+    type: string;
+  }>;
+  deals?: Array<any>;
+}
+
+
+const uploadToNFTStorage = async (data: FormData): Promise<INFTStorageResult> => {
+  if (!process.env.REACT_APP_NFT_STORAGE_KEY) {
+    return Promise.reject(
+      new Error(
+        'REACT_APP_NFT_STORAGE_KEY is missing. Please provide the API key in the .env file.'
+      )
+    );
+  }
+
+  const resp = await fetch(
+    NFT_STORAGE_UPLOAD_ENDPOINT,
+    {
+      method: 'POST',
+      headers: new Headers({
+        'Authorization': `Bearer ${process.env.REACT_APP_NFT_STORAGE_KEY}`
+      }),
+      body: data,
+    },
+  );
+
+  if (!resp.ok) {
+    return Promise.reject(
+      new Error(
+        'Unable to upload the artwork to Arweave. Please wait and then try again.',
+      ),
+    );
+  }
+
+  const result: INFTStorageResult = await resp.json();
+
+  if (result.error) {
+    return Promise.reject(new Error(result.error.message));
+  }
+
+  return result;
+}
+
 interface IArweaveResult {
   error?: string;
   messages?: Array<{
